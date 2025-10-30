@@ -1,0 +1,320 @@
+# Text Toner - Git Ignore File
+# Covers both Flutter Frontend and Python Backend
+
+# ============================================
+# BACKEND (Python/FastAPI)
+# ============================================
+
+# Environment Variables (IMPORTANT - Contains API Keys!)
+backend/.env
+backend/*.env
+.env
+*.env
+.env.local
+.env.*.local
+.venv/
+env/
+
+# Python
+backend/__pycache__/
+backend/*.py[cod]
+backend/*$py.class
+backend/*.so
+backend/.Python
+backend/build/
+backend/develop-eggs/
+backend/dist/
+backend/downloads/
+backend/eggs/
+backend/.eggs/
+backend/lib/
+backend/lib64/
+backend/parts/
+backend/sdist/
+backend/var/
+backend/wheels/
+backend/share/python-wheels/
+backend/*.egg-info/
+backend/.installed.cfg
+backend/*.egg
+backend/MANIFEST
+
+# Virtual Environment
+backend/venv/
+backend/env/
+backend/ENV/
+backend/env.bak/
+backend/venv.bak/
+
+# PyCharm
+backend/.idea/
+backend/*.iml
+
+# VS Code
+backend/.vscode/
+
+# Jupyter Notebook
+backend/.ipynb_checkpoints
+
+# pyenv
+backend/.python-version
+
+# Celery
+backend/celerybeat-schedule
+backend/celerybeat.pid
+
+# SageMath parsed files
+backend/*.sage.py
+
+# Pytest
+backend/.pytest_cache/
+backend/.tox/
+
+# Coverage
+backend/htmlcov/
+backend/.coverage
+backend/.coverage.*
+backend/coverage.xml
+backend/*.cover
+
+# MyPy
+backend/.mypy_cache/
+backend/.dmypy.json
+backend/dmypy.json
+
+# Pyre
+backend/.pyre/
+
+# ============================================
+# FRONTEND (Flutter)
+# ============================================
+
+# Miscellaneous
+frontend/*.class
+frontend/*.log
+frontend/*.pyc
+frontend/*.swp
+frontend/.DS_Store
+frontend/.atom/
+frontend/.buildlog/
+frontend/.history
+frontend/.svn/
+frontend/migrate_working_dir/
+
+# IntelliJ related
+frontend/*.iml
+frontend/*.ipr
+frontend/*.iws
+frontend/.idea/
+
+# VS Code
+frontend/.vscode/
+
+# Flutter/Dart/Pub related
+frontend/**/doc/api/
+frontend/**/ios/Flutter/.last_build_id
+frontend/.dart_tool/
+frontend/.flutter-plugins
+frontend/.flutter-plugins-dependencies
+frontend/.packages
+frontend/.pub-cache/
+frontend/.pub/
+frontend/build/
+frontend/flutter_*.png
+frontend/linked_*.ds
+frontend/unlinked.ds
+frontend/unlinked_spec.ds
+
+# Web related
+frontend/lib/generated_plugin_registrant.dart
+
+# Symbolication related
+frontend/app.*.symbols
+
+# Obfuscation related
+frontend/app.*.map.json
+
+# Android Studio will place build artifacts here
+frontend/android/app/debug
+frontend/android/app/profile
+frontend/android/app/release
+
+# Android/IntelliJ/Android Studio
+frontend/android/.idea/
+frontend/android/.gradle
+frontend/android/local.properties
+frontend/android/*.iml
+frontend/android/.gradletasknamecache
+frontend/android/captures/
+frontend/android/*.log
+frontend/android/gradle-app.setting
+frontend/android/app/google-services.json
+frontend/android/.externalNativeBuild/
+frontend/android/.cxx/
+frontend/android/key.properties
+
+# iOS/XCode
+frontend/ios/.generated/
+frontend/ios/Flutter/App.framework
+frontend/ios/Flutter/Flutter.framework
+frontend/ios/Flutter/Flutter.podspec
+frontend/ios/Flutter/Generated.xcconfig
+frontend/ios/Flutter/ephemeral/
+frontend/ios/Flutter/app.flx
+frontend/ios/Flutter/app.zip
+frontend/ios/Flutter/flutter_assets/
+frontend/ios/Flutter/flutter_export_environment.sh
+frontend/ios/ServiceDefinitions.json
+frontend/ios/Runner/GeneratedPluginRegistrant.*
+frontend/ios/Pods/
+frontend/ios/.symlinks/
+frontend/ios/**/dgph
+frontend/ios/.vagrant/
+frontend/ios/DerivedData/
+frontend/ios/**/*.pbxuser
+frontend/ios/**/*.mode1v3
+frontend/ios/**/*.mode2v3
+frontend/ios/**/*.perspectivev3
+frontend/ios/**/*sync/
+frontend/ios/**/.sconsign.dblite
+frontend/ios/**/.tags*
+frontend/ios/**/.vagrant/
+frontend/ios/**/DerivedData/
+frontend/ios/**/Icon?
+frontend/ios/**/Pods/
+frontend/ios/**/.symlinks/
+frontend/ios/**/profile
+frontend/ios/**/xcuserdata
+frontend/ios/.generated/
+frontend/ios/Flutter/flutter_export_environment.sh
+
+# macOS
+frontend/macos/Flutter/GeneratedPluginRegistrant.swift
+frontend/macos/Flutter/ephemeral/
+
+# Linux
+frontend/linux/flutter/ephemeral/
+
+# Windows
+frontend/windows/flutter/ephemeral/
+
+# Coverage
+frontend/coverage/
+
+# Exceptions to above rules
+!frontend/**/ios/**/default.mode1v3
+!frontend/**/ios/**/default.mode2v3
+!frontend/**/ios/**/default.pbxuser
+!frontend/**/ios/**/default.perspectivev3
+
+# ============================================
+# GLOBAL IGNORES
+# ============================================
+
+# Operating System Files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+
+# Editor Files
+*~
+*.swp
+*.swo
+*.bak
+*.tmp
+*.orig
+.project
+.classpath
+.settings/
+*.sublime-project
+*.sublime-workspace
+
+# Logs
+*.log
+logs/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Temporary Files
+tmp/
+temp/
+*.tmp
+*.temp
+
+# IDE
+.idea/
+*.iml
+.vscode/
+*.code-workspace
+
+# ============================================
+# PROJECT SPECIFIC
+# ============================================
+
+# API Keys and Secrets (CRITICAL!)
+**/.env
+**/secrets.json
+**/credentials.json
+**/*-key.json
+**/firebase-config.js
+**/google-services.json
+**/GoogleService-Info.plist
+
+# Database
+*.db
+*.sqlite
+*.sqlite3
+
+# Cache
+cache/
+.cache/
+
+# Build artifacts
+build/
+dist/
+out/
+
+# Test coverage
+coverage/
+.nyc_output/
+
+# Documentation build
+docs/_build/
+site/
+
+# ============================================
+# KEEP THESE FILES (Exceptions)
+# ============================================
+
+# Keep empty directories with .gitkeep
+!**/.gitkeep
+
+# Keep example environment files
+!.env.example
+!env.example
+!.env.template
+
+# Keep README files
+!**/README.md
+
+# ============================================
+# IMPORTANT NOTES
+# ============================================
+# 
+# 1. backend/.env contains GEMINI_API_KEY - NEVER commit this!
+# 2. All build/ directories are ignored
+# 3. All dependency caches are ignored
+# 4. IDE-specific files are ignored
+# 5. Platform-specific build artifacts are ignored
+#
+# To add to git anyway (be careful!):
+#   git add -f <file>
+#
+# ============================================

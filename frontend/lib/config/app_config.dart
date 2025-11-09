@@ -16,6 +16,10 @@ class AppConfig {
   static const String quickAnalyzeEndpointPath = '/quick-analyze';
   static const String supportedTonesEndpointPath = '/supported-tones';
   static const String healthEndpointPath = '/health';
+  static const String loginEndpointPath = '/auth/login';
+  static const String registerEndpointPath = '/auth/register';
+  static const String profileEndpointPath = '/auth/me';
+  static const String conversationsEndpointPath = '/conversations';
 
   // Animation durations
   static const Duration messageAnimationDuration = Duration(milliseconds: 600);

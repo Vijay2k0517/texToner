@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
+
+import '../models/conversation.dart';
 import '../models/message.dart';
 import '../services/api_client.dart';
+import 'auth_provider.dart';
 
 class ChatProvider extends ChangeNotifier {
   ChatProvider({ApiClient? apiClient}) : _apiClient = apiClient ?? ApiClient();
@@ -9,13 +12,27 @@ class ChatProvider extends ChangeNotifier {
   bool _isTyping = false;
   final ApiClient _apiClient;
   List<String> _supportedTones = [];
+  bool _initialized = false;
+  bool _isAuthenticated = false;
+  bool _loadingHistory = false;
+  bool _hasFetchedHistory = false;
+  final List<ConversationSummary> _conversationHistory = [];
+  final Map<int, ConversationDetail> _conversationCache = {};
 
   List<Message> get messages => List.unmodifiable(_messages);
   bool get isTyping => _isTyping;
   List<String> get supportedTones => _supportedTones;
+  bool get isAuthenticated => _isAuthenticated;
+  bool get isHistoryLoading => _loadingHistory;
+  List<ConversationSummary> get conversationHistory =>
+      List.unmodifiable(_conversationHistory);
 
   /// Initialize provider and fetch supported tones
   Future<void> initialize() async {
+    if (_initialized || !_isAuthenticated) {
+      return;
+    }
+
     try {
       _supportedTones = await _apiClient.getSupportedTones();
       notifyListeners();
@@ -34,6 +51,9 @@ class ChatProvider extends ChangeNotifier {
         'enthusiastic',
         'neutral',
       ];
+      notifyListeners();
+    } finally {
+      _initialized = true;
     }
   }
 
@@ -45,6 +65,31 @@ class ChatProvider extends ChangeNotifier {
     } catch (e) {
       debugPrint('Backend health check failed: $e');
       return false;
+    }
+  }
+
+  void syncAuth(AuthProvider auth) {
+    final wasAuthenticated = _isAuthenticated;
+    final isNowAuthenticated = auth.isAuthenticated;
+
+    if (!isNowAuthenticated) {
+      _isAuthenticated = false;
+      _initialized = false;
+      _hasFetchedHistory = false;
+      _loadingHistory = false;
+      _conversationHistory.clear();
+      _conversationCache.clear();
+      clearMessages();
+      return;
+    }
+
+    _isAuthenticated = true;
+    if (!wasAuthenticated) {
+      _initialized = false;
+      _hasFetchedHistory = false;
+      _conversationHistory.clear();
+      _conversationCache.clear();
+      notifyListeners();
     }
   }
 
@@ -92,12 +137,63 @@ class ChatProvider extends ChangeNotifier {
     notifyListeners();
   }
 
+  Future<void> refreshConversationHistory({bool force = false}) async {
+    if (!_isAuthenticated) {
+      return;
+    }
+    if (_loadingHistory) {
+      return;
+    }
+    if (_hasFetchedHistory && !force) {
+      return;
+    }
+
+    _loadingHistory = true;
+    notifyListeners();
+
+    try {
+      final history = await _apiClient.getConversationHistory();
+      _conversationHistory
+        ..clear()
+        ..addAll(history);
+      _hasFetchedHistory = true;
+    } catch (e) {
+      debugPrint('Failed to load conversation history: $e');
+    } finally {
+      _loadingHistory = false;
+      notifyListeners();
+    }
+  }
+
+  Future<ConversationDetail?> loadConversationDetail(int id) async {
+    if (_conversationCache.containsKey(id)) {
+      return _conversationCache[id];
+    }
+    if (!_isAuthenticated) {
+      return null;
+    }
+
+    try {
+      final detail = await _apiClient.getConversationDetail(id);
+      _conversationCache[id] = detail;
+      notifyListeners();
+      return detail;
+    } catch (e) {
+      debugPrint('Failed to load conversation detail: $e');
+      return null;
+    }
+  }
+
   /// Sends the user message to the backend and appends the tone analysis response.
   /// Returns null on success, or an error message string on failure.
   Future<String?> sendMessageToBackend(
     String userMessage, {
     String? context,
   }) async {
+    if (!_isAuthenticated) {
+      return 'Please log in to analyze your text.';
+    }
+
     // Add user message to UI immediately
     addUserMessage(userMessage);
 
@@ -121,15 +217,14 @@ class ChatProvider extends ChangeNotifier {
         suggestions: analysis.suggestions,
         explanation: analysis.explanation,
       );
+      if (analysis.conversationId != null) {
+        await refreshConversationHistory(force: true);
+      }
       return null;
     } catch (e) {
-      // On error, show a friendly error message as a bot message
-      final errorMessage =
-          e.toString().contains('Server error')
-              ? 'Backend server is not responding. Please ensure the backend is running.'
-              : 'Sorry, I could not process your request. Please try again.';
-      addBotMessage(errorMessage);
-      return e.toString();
+      final message = _mapErrorMessage(e);
+      addBotMessage(message);
+      return message;
     } finally {
       setTyping(false);
     }
@@ -206,5 +301,19 @@ class ChatProvider extends ChangeNotifier {
   void clearMessages() {
     _messages.clear();
     notifyListeners();
+  }
+
+  String _mapErrorMessage(Object error) {
+    if (error is ApiException) {
+      if (error.statusCode == 401) {
+        return 'Your session expired. Please log in again.';
+      }
+      return error.message;
+    }
+    final message = error.toString();
+    if (message.contains('SocketException')) {
+      return 'Backend server is not responding. Please ensure the backend is running.';
+    }
+    return 'Sorry, I could not process your request. Please try again.';
   }
 }

@@ -2,15 +2,31 @@ from __future__ import annotations
 
 import os
 import re
+import json
 import time
 import logging
+from datetime import datetime, timedelta
 from typing import List, Optional, Dict, Any
 from enum import Enum
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Depends, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
-from pydantic import BaseModel
+from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
+from jose import JWTError, jwt
+from passlib.context import CryptContext
+from pydantic import BaseModel, EmailStr
+from sqlalchemy import (
+    Column,
+    Integer,
+    String,
+    DateTime,
+    Text,
+    Float,
+    ForeignKey,
+    create_engine,
+)
+from sqlalchemy.orm import declarative_base, sessionmaker, relationship, Session
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -33,6 +49,21 @@ except ImportError:
 
 APP_NAME = "smart-text-toning-analyzer"
 
+DATABASE_URL = os.environ.get("DATABASE_URL", "sqlite:///./text_toner.db")
+SECRET_KEY = os.environ.get("JWT_SECRET_KEY", "change-me-super-secret")
+ALGORITHM = "HS256"
+ACCESS_TOKEN_EXPIRE_MINUTES = int(os.environ.get("ACCESS_TOKEN_EXPIRE_MINUTES", "120"))
+
+engine = create_engine(
+    DATABASE_URL,
+    connect_args={"check_same_thread": False} if DATABASE_URL.startswith("sqlite") else {},
+)
+SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+Base = declarative_base()
+
+pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/auth/login")
+
 class ToneCategory(Enum):
     FORMAL = "formal"
     CASUAL = "casual"
@@ -44,6 +75,35 @@ class ToneCategory(Enum):
     AUTHORITATIVE = "authoritative"
     ENTHUSIASTIC = "enthusiastic"
     NEUTRAL = "neutral"
+
+
+class User(Base):
+    __tablename__ = "users"
+
+    id = Column(Integer, primary_key=True, index=True)
+    email = Column(String(255), unique=True, index=True, nullable=False)
+    hashed_password = Column(String(255), nullable=False)
+    full_name = Column(String(255), nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+
+    conversations = relationship("Conversation", back_populates="user", cascade="all, delete-orphan")
+
+
+class Conversation(Base):
+    __tablename__ = "conversations"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
+    original_text = Column(Text, nullable=False)
+    context = Column(String(255), nullable=True)
+    detected_tone = Column(String(100), nullable=True)
+    tone_category = Column(String(100), nullable=True)
+    confidence = Column(Float, nullable=True)
+    analysis_json = Column(Text, nullable=False)
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
+
+    user = relationship("User", back_populates="conversations")
 
 class ToneAnalysisRequest(BaseModel):
     text: str
@@ -57,6 +117,145 @@ class ToneAnalysisResponse(BaseModel):
     enhanced_versions: List[Dict[str, str]]
     suggestions: List[str]
     explanation: str
+    conversation_id: Optional[int] = None
+    context: Optional[str] = None
+    note: Optional[str] = None
+    service: Optional[str] = None
+
+class UserBase(BaseModel):
+    email: EmailStr
+    full_name: Optional[str] = None
+
+
+class UserCreate(UserBase):
+    password: str
+
+
+class UserOut(UserBase):
+    id: int
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
+class Token(BaseModel):
+    access_token: str
+    token_type: str = "bearer"
+
+
+class TokenResponse(Token):
+    user: UserOut
+
+
+class TokenData(BaseModel):
+    email: Optional[str] = None
+
+
+class ConversationSummary(BaseModel):
+    id: int
+    original_text: str
+    detected_tone: Optional[str] = None
+    tone_category: Optional[str] = None
+    confidence: Optional[float] = None
+    context: Optional[str] = None
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
+class ConversationDetail(ConversationSummary):
+    analysis: Dict[str, Any]
+
+
+def get_db() -> Session:
+    db = SessionLocal()
+    try:
+        yield db
+    finally:
+        db.close()
+
+
+def verify_password(plain_password: str, hashed_password: str) -> bool:
+    return pwd_context.verify(plain_password, hashed_password)
+
+
+def get_password_hash(password: str) -> str:
+    return pwd_context.hash(password)
+
+
+def get_user_by_email(db: Session, email: str) -> Optional[User]:
+    if not email:
+        return None
+    return db.query(User).filter(User.email == email.lower()).first()
+
+
+def authenticate_user(db: Session, email: str, password: str) -> Optional[User]:
+    user = get_user_by_email(db, email)
+    if not user:
+        return None
+    if not verify_password(password, user.hashed_password):
+        return None
+    return user
+
+
+def create_access_token(data: Dict[str, Any], expires_delta: Optional[timedelta] = None) -> str:
+    to_encode = data.copy()
+    expire = datetime.utcnow() + (expires_delta or timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES))
+    to_encode.update({"exp": expire})
+    encoded_jwt = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
+    return encoded_jwt
+
+
+async def get_current_user(
+    token: str = Depends(oauth2_scheme),
+    db: Session = Depends(get_db),
+) -> User:
+    credentials_exception = HTTPException(
+        status_code=status.HTTP_401_UNAUTHORIZED,
+        detail="Could not validate credentials",
+        headers={"WWW-Authenticate": "Bearer"},
+    )
+
+    try:
+        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        email: Optional[str] = payload.get("sub")
+        if email is None:
+            raise credentials_exception
+        token_data = TokenData(email=email)
+    except JWTError:
+        raise credentials_exception from None
+
+    user = get_user_by_email(db, token_data.email)
+    if user is None:
+        raise credentials_exception
+    return user
+
+
+def save_conversation(
+    db: Session,
+    user: User,
+    request: ToneAnalysisRequest,
+    analysis: Dict[str, Any],
+) -> Conversation:
+    conversation = Conversation(
+        user_id=user.id,
+        original_text=request.text.strip(),
+        context=request.context,
+        detected_tone=analysis.get("detected_tone"),
+        tone_category=analysis.get("tone_category"),
+        confidence=float(analysis.get("confidence", 0.0)) if analysis.get("confidence") is not None else None,
+        analysis_json=json.dumps(analysis, ensure_ascii=False),
+    )
+    db.add(conversation)
+    db.commit()
+    db.refresh(conversation)
+    return conversation
+
+
+def serialize_user(user: User) -> UserOut:
+    return UserOut.model_validate(user)
 
 class GeminiTextToningAnalyzer:
     def __init__(self):
@@ -320,6 +519,7 @@ class GeminiTextToningAnalyzer:
         }
 
 # Initialize Gemini analyzer
+Base.metadata.create_all(bind=engine)
 gemini_analyzer = GeminiTextToningAnalyzer()
 
 app = FastAPI(title=APP_NAME)
@@ -331,6 +531,45 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+@app.post("/auth/register", response_model=UserOut, status_code=status.HTTP_201_CREATED)
+def register_user(user: UserCreate, db: Session = Depends(get_db)):
+    existing = get_user_by_email(db, user.email)
+    if existing:
+        raise HTTPException(status_code=400, detail="Email already registered")
+
+    db_user = User(
+        email=user.email.lower(),
+        hashed_password=get_password_hash(user.password),
+        full_name=user.full_name,
+    )
+    db.add(db_user)
+    db.commit()
+    db.refresh(db_user)
+    return db_user
+
+
+@app.post("/auth/login", response_model=TokenResponse)
+def login(
+    form_data: OAuth2PasswordRequestForm = Depends(),
+    db: Session = Depends(get_db),
+):
+    user = authenticate_user(db, form_data.username, form_data.password)
+    if not user:
+        raise HTTPException(status_code=401, detail="Incorrect email or password")
+
+    access_token = create_access_token({"sub": user.email})
+    return TokenResponse(
+        access_token=access_token,
+        token_type="bearer",
+        user=serialize_user(user),
+    )
+
+
+@app.get("/auth/me", response_model=UserOut)
+async def get_profile(current_user: User = Depends(get_current_user)):
+    return serialize_user(current_user)
 
 @app.on_event("startup")
 async def startup_event():
@@ -350,6 +589,55 @@ async def root():
         "service": "text-toning-analyzer"
     }
 
+
+@app.get("/conversations", response_model=List[ConversationSummary])
+async def list_conversations(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    conversations = (
+        db.query(Conversation)
+        .filter(Conversation.user_id == current_user.id)
+        .order_by(Conversation.created_at.desc())
+        .all()
+    )
+    return [
+        ConversationSummary.model_validate(conversation)
+        for conversation in conversations
+    ]
+
+
+@app.get("/conversations/{conversation_id}", response_model=ConversationDetail)
+async def get_conversation_detail(
+    conversation_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    conversation = (
+        db.query(Conversation)
+        .filter(
+            Conversation.id == conversation_id,
+            Conversation.user_id == current_user.id,
+        )
+        .first()
+    )
+
+    if not conversation:
+        raise HTTPException(status_code=404, detail="Conversation not found")
+
+    analysis_payload = json.loads(conversation.analysis_json or "{}")
+    detail = ConversationDetail(
+        id=conversation.id,
+        original_text=conversation.original_text,
+        detected_tone=conversation.detected_tone,
+        tone_category=conversation.tone_category,
+        confidence=conversation.confidence,
+        context=conversation.context,
+        created_at=conversation.created_at,
+        analysis=analysis_payload,
+    )
+    return detail
+
 @app.get("/health")
 async def health():
     return {
@@ -360,7 +648,11 @@ async def health():
     }
 
 @app.post("/analyze-tone", response_model=ToneAnalysisResponse)
-async def analyze_tone(request: ToneAnalysisRequest):
+async def analyze_tone(
+    request: ToneAnalysisRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
     """Analyze text tone and provide enhanced versions."""
     
     if not request.text or not request.text.strip():
@@ -378,19 +670,33 @@ async def analyze_tone(request: ToneAnalysisRequest):
                 request.context
             )
         
+        response_payload: Dict[str, Any]
         if analysis_result:
             logger.info("Successfully generated tone analysis")
-            return JSONResponse(analysis_result)
-        
-        # Fallback to smart analysis
-        logger.info("Using fallback tone analysis")
-        fallback_analysis = gemini_analyzer._generate_fallback_analysis(request.text)
-        
-        return JSONResponse({
-            **fallback_analysis,
-            "service": "smart-fallback",
-            "note": "Gemini unavailable. Using smart fallback analysis."
-        })
+            response_payload = dict(analysis_result)
+        else:
+            # Fallback to smart analysis
+            logger.info("Using fallback tone analysis")
+            fallback_analysis = gemini_analyzer._generate_fallback_analysis(request.text)
+            response_payload = {
+                **fallback_analysis,
+                "service": "smart-fallback",
+                "note": "Gemini unavailable. Using smart fallback analysis.",
+            }
+
+        response_payload["context"] = request.context
+        if response_payload.get("confidence") is not None:
+            try:
+                response_payload["confidence"] = float(response_payload["confidence"])
+            except (TypeError, ValueError):
+                response_payload["confidence"] = 0.0
+        else:
+            response_payload["confidence"] = 0.0
+
+        conversation = save_conversation(db, current_user, request, response_payload)
+        response_payload["conversation_id"] = conversation.id
+
+        return JSONResponse(response_payload)
 
     except HTTPException:
         raise

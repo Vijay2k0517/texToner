@@ -926,6 +926,14 @@ SOFTWARE.
 3. **Issues**: Search existing issues or create a new one
 4. **Discussions**: Join GitHub Discussions for questions
 
+### Contact
+
+For questions, suggestions, or collaboration opportunities:
+
+- **Email**: [vijaynarayanancool@gmail.com](mailto:vijaynarayanancool@gmail.com)
+- **LinkedIn**: [Vijaya Narayanan](https://www.linkedin.com/in/vijaya-narayanan)
+- **GitHub**: [@Vijay2k0517](https://github.com/Vijay2k0517)
+
 ### Frequently Asked Questions
 
 **Q: How do I get a Gemini API key?**  
@@ -1063,6 +1071,14 @@ If you find this project useful, please consider giving it a star! ⭐
 - **API Docs**: http://localhost:8000/docs (when running)
 - **Issues**: [github.com/Vijay2k0517/textToner/issues](https://github.com/Vijay2k0517/textToner/issues)
 - **Gemini AI**: [ai.google.dev](https://ai.google.dev/)
+
+### 👨‍💻 Developer
+
+**Vijaya Narayanan**
+
+- 📧 Email: [vijaynarayanancool@gmail.com](mailto:vijaynarayanancool@gmail.com)
+- 💼 LinkedIn: [linkedin.com/in/vijaya-narayanan](https://www.linkedin.com/in/vijaya-narayanan)
+- 🐙 GitHub: [@Vijay2k0517](https://github.com/Vijay2k0517)
 
 ---
 

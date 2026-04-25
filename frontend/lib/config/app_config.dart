@@ -10,7 +10,7 @@ class AppConfig {
   static const String apiBaseUrl = String.fromEnvironment(
     'API_BASE_URL',
     defaultValue:
-        'http://localhost:8000', // Use http://10.0.2.2:8000 for Android emulator
+        'http://192.168.29.41:8000', // Use http://10.0.2.2:8000 for Android emulator
   );
   static const String analyzeEndpointPath = '/analyze-tone';
   static const String quickAnalyzeEndpointPath = '/quick-analyze';
